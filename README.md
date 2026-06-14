@@ -212,9 +212,9 @@ In rough order of correctness:
 | 2026-05-24 | Vulnerability discovered and confirmed on ZWO ASI2600MC Air fw 42.97 and ZWO Seestar S50 (fw seestar-3.2 / 2775). |
 | 2026-05-25 | Report drafted (this document). |
 | 2026-05-25 | Report sent to ZWO. |
-| _TBD_ | ZWO acknowledgement. |
+| 2026-05-25 | ZWO acknowledgement. |
 | _TBD_ | Patched firmware released. |
-| _TBD_ | Public disclosure. |
+| 2026-06-14 | Public disclosure. Feedback was received on June 4th, confirming work was underway on a fix; no further feedback since, and ZWO closed case 47033.
 
 ---
 
