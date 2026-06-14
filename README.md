@@ -13,7 +13,7 @@
 
 ## TL;DR
 
-The `begin_recv` JSON-RPC method on TCP/4350 accepts a `file_name` parameter that is later spliced into a `/bin/sh` command without proper escaping. The only sanitisation is a literal-`/` filter. Command-substitution syntax (`$(...)`) and every other shell metacharacter pass through and are evaluated by the shell when the updater computes the package's md5 — **before** the md5 or RSA-SHA1 signature checks have a chance to run.
+The `begin_recv` JSON-RPC method on TCP/4350 accepts a `file_name` parameter that is later spliced into a `/bin/sh` command without proper escaping. The only sanitisation is a literal-`/` filter. Command-substitution syntax (`$(...)`) and every other shell metacharacter pass through and are evaluated by the shell when the updater computes the package's md5 **before** the md5 or RSA-SHA1 signature checks have a chance to run.
 
 The injected code executes as user `pi`, which has passwordless `sudo` on stock firmware. Full device compromise from a single unauthenticated TCP message.
 
@@ -51,7 +51,7 @@ Combined with field reports that ZWO ASIAIR Mini / Plus / Pro share the same dae
 - **ASIAIR** family: Mini, Plus, Pro — file port 4360 (matching the ASI2600MC Air's port allocation).
 - **Cameras with built-in ASIAIR**: any ASI camera that integrates the ASIAIR firmware. The ASI2600MC Air is the first such unit; subsequent integrated cameras in the line (e.g. announced future "ASI \<model\> Air" SKUs) inherit the same updater code path and thus the same bug unless ZWO has rebuilt the binary in the meantime.
 
-ZWO security engineering should treat this report as covering all of the above. The PoC's `--device auto` mode probes 4360 then 4361, so a single test command works on any device variant — the operator does not need to know in advance which family they're testing.
+ZWO security engineering should treat this report as covering all of the above. The PoC's `--device auto` mode probes 4360 then 4361, so a single test command works on any device variant. The operator does not need to know in advance which family they're testing.
 
 ---
 
@@ -87,7 +87,7 @@ The first line is the bug. `<file_name>` is interpolated into a shell-pipeline s
 
 ### What's filtered, and what isn't
 
-The server's filename validation rejects exactly one character: forward slash (`/`). Every other shell metacharacter — `$`, `(`, `)`, `;`, `|`, `` ` ``, `"`, `'`, `\`, `&`, `..`, embedded spaces — is accepted.
+The server's filename validation rejects exactly one character: forward slash (`/`). Every other shell metacharacter `$`, `(`, `)`, `;`, `|`, `` ` ``, `"`, `'`, `\`, `&`, `..`, embedded spaces are accepted.
 
 Verified on Seestar S50 by sending each character in a probe:
 
@@ -178,7 +178,7 @@ PRETTY_NAME="Raspbian GNU/Linux 10 (buster)"
 
 ## Impact
 
-Any host on the same network as a powered-on ASIAIR or Seestar — including any device on the customer's home LAN, any device on the ASIAIR's own Wi-Fi access point, or any device on a star party / club observatory network where ASIAIRs are commonly connected — can take complete control of the device with a single TCP message. No interaction with the iOS/Android app is required.
+Any host on the same network as a powered-on ASIAIR, or Seestar, including any device on the customer's home LAN, any device on the ASIAIR's own Wi-Fi access point, or any device on a star party / club observatory network where ASIAIRs are commonly connected, can take complete control of the device with a single TCP message. No interaction with the iOS/Android app is required.
 
 Concrete consequences:
 
@@ -196,9 +196,9 @@ In rough order of correctness:
 
 1. **Reject `file_name` values containing any shell metacharacter** (`$`, `` ` ``, `;`, `|`, `&`, `<`, `>`, `(`, `)`, `{`, `}`, `[`, `]`, `'`, `"`, `\`, newline, tab, and space) at the JSON-RPC layer. Allow `[A-Za-z0-9._-]` only.
 2. **Stop using `system()` / `popen()` for verification.** Compute md5 in-process via `EVP_DigestInit_ex` / `EVP_DigestFinal_ex`. Verify the signature with `EVP_PKEY_verify`. No shell calls.
-3. **If a shell call is unavoidable**, build the argv array directly via `execve()` / `posix_spawn()` with the filename as a literal argument — the shell never sees the value.
+3. **If a shell call is unavoidable**, build the argv array directly via `execve()` / `posix_spawn()` with the filename as a literal argument. The shell never sees the value.
 4. **Move the signature check first.** Today md5 happens before signature; even after fixing the injection, an attacker who finds an md5 collision could still reach the signature step. Reorder so signature verification is the first thing that runs on any received bytes.
-5. **Authenticate `begin_recv` itself.** The license file at `/home/pi/.ZWO/zwoair_license` already contains a per-device signed token — bind the OTA channel to a session keyed off the device's serial + a nonce so a network attacker cannot trigger update flows at will.
+5. **Authenticate `begin_recv` itself.** The license file at `/home/pi/.ZWO/zwoair_license` already contains a per-device signed token. Bind the OTA channel to a session keyed off the device's serial + a nonce so a network attacker cannot trigger update flows at will.
 6. **Move both ports away from `0.0.0.0`.** The updater listens on every interface; in practice it only needs the AP interface (`uap0`) and possibly the local Wi-Fi interface. Binding to `127.0.0.1` plus the AP interface narrows the attack surface.
 7. **Upgrade the signature digest.** Today's path is SHA-1; modern code should be SHA-256.
 8. **Stop running daemons as `pi` with passwordless sudo.** Give the updater its own service account with a tightly-scoped `sudoers` entry for `mount` and the package-installer steps; remove the rest of `sudo` from `pi`.
